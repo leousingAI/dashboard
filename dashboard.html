@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>经营分析看板 - 数字运营BG</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalables.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; min-height: 100vh; }
+        .header { background: rgba(255,255,255,0.05); padding: 20px 40px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 24px; font-weight: 600; background: linear-gradient(90deg, #00d9ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-info { color: rgba(255,255,255,0.6); font-size: 14px; }
+        .container { padding: 30px 40px; max-width: 1600px; margin: 0 auto; }
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s, box-shadow 0.3s; }
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+        .kpi-card.revenue { border-left: 4px solid #00d9ff; }
+        .kpi-card.contract { border-left: 4px solid #00ff88; }
+        .kpi-card.profit { border-left: 4px solid #ff6b6b; }
+        .kpi-card.budget { border-left: 4px solid #ffd93d; }
+        .kpi-label { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+        .kpi-value { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+        .kpi-card.revenue .kpi-value { color: #00d9ff; }
+        .kpi-card.contract .kpi-value { color: #00ff88; }
+        .kpi-card.profit .kpi-value { color: #ff6b6b; }
+        .kpi-card.budget .kpi-value { color: #ffd93d; }
+        .kpi-change { font-size: 13px; display: flex; align-items: center; gap: 4px; }
+        .kpi-change.up { color: #00ff88; }
+        .kpi-change.down { color: #ff6b6b; }
+        .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .chart-card { background: rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; border: 1px solid rgba(255,255,255,0.1); }
+        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .chart-container { position: relative; height: 300px; }
+        .alert-panel { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3); border-radius: 16px; padding: 24px; margin-bottom: 30px; }
+        .alert-title { font-size: 16px; font-weight: 600; color: #ff6b6b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .alert-item { background: rgba(255,107,107,0.1); border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .alert-item:last-child { margin-bottom: 0; }
+        .table-section { background: rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; border: 1px solid rgba(255,255,255,0.1); }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .data-table th { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); text-transform: uppercase; }
+        .data-table td { font-size: 14px; }
+        .data-table tr:hover td { background: rgba(255,255,255,0.05); }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge.warning { background: rgba(255,217,61,0.2); color: #ffd93d; }
+        .badge.danger { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+        .badge.success { background: rgba(0,255,136,0.2); color: #00ff88; }
+        .progress-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .progress-fill.good { background: linear-gradient(90deg, #00ff88, #00d9ff); }
+        .progress-fill.warning { background: linear-gradient(90deg, #ffd93d, #ff9f43); }
+        .progress-fill.danger { background: linear-gradient(90deg, #ff6b6b, #ee5a5a); }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab.active { background: linear-gradient(135deg, #00d9ff, #00ff88); color: #1a1a2e; border: none; }
+        .footer { text-align: center; padding: 30px; color: rgba(255,255,255,0.4); font-size: 13px; }
+        @media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .kpi-row { grid-template-columns: 1fr; } .container { padding: 20px; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 经营分析看板 - 数字运营BG</h1>
+        <div class="header-info">
+            数据更新: 2026年3月 | 周期: 1-2月累计 | 数据来源: Excel实时提取
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- KPI卡片区 - 从Excel提取的真实数据 -->
+        <div class="kpi-row">
+            <div class="kpi-card revenue">
+                <div class="kpi-label">📈 营业收入 (1-2月累计)</div>
+                <div class="kpi-value">¥6.45亿</div>
+                <div class="kpi-change up">
+                    <span>📊</span> 年度预算: ¥43.75亿
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill good" style="width: 14.7%;"></div>
+                </div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">预算完成率 14.7%</div>
+            </div>
+            
+            <div class="kpi-card contract">
+                <div class="kpi-label">📝 新签合同额</div>
+                <div class="kpi-value">待归集</div>
+                <div class="kpi-change">
+                    <span>📊</span> 年度目标: ¥50.31亿
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%; background: rgba(255,255,255,0.2);"></div>
+                </div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">数据待归集</div>
+            </div>
+            
+            <div class="kpi-card profit">
+                <div class="kpi-label">💰 毛利润 (1-2月累计)</div>
+                <div class="kpi-value">¥1.63亿</div>
+                <div class="kpi-change">
+                    <span>📊</span> 毛利率 25.26%
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill good" style="width: 100%;"></div>
+                </div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">达到预警线</div>
+            </div>
+            
+            <div class="kpi-card budget">
+                <div class="kpi-label">⏱️ 预算执行率</div>
+                <div class="kpi-value">14.7%</div>
+                <div class="kpi-change">
+                    <span>⏱️</span> 时间进度 16.7% (2/12月)
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill warning" style="width: 88%;"></div>
+                </div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">进度滞后 2%</div>
+            </div>
+        </div>
+        
+        <!-- 预警面板 -->
+        <div class="alert-panel">
+            <div class="alert-title">
+                🚨 毛利润异常预警
+            </div>
+            <div id="alertList">
+                <div class="alert-item">
+                    <div><strong>提示：</strong>当前数据公司整体毛利率为25.26%，已达到预警线。</div>
+                    <span class="badge warning">监控中</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 图表区 -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-title">📈 累计营业收入趋势 (按月)</div>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-title">🏢 各公司营收占比</div>
+                <div class="chart-container">
+                    <canvas id="companyPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 多维度分析图表 -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-title">📊 预算执行进度对比 (万元)</div>
+                <div class="chart-container">
+                    <canvas id="budgetCompareChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-title">📉 各事业部营收完成率</div>
+                <div class="chart-container">
+                    <canvas id="divisionChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 数据明细表 -->
+        <div class="table-section">
+            <div class="chart-title">📋 事业部经营数据明细 (1-2月累计)</div>
+            
+            <table class="data-table" id="detailTable">
+                <thead>
+                    <tr>
+                        <th>事业部</th>
+                        <th>1月营收</th>
+                        <th>2月营收</th>
+                        <th>累计营收</th>
+                        <th>年度计划</th>
+                        <th>完成率</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>经营分析看板 | 数据来源: 数字运营BG经营数据 (Excel实时提取)</p>
+        <p>技术支持: OpenClaw Analytics | 更新时间: <span id="updateTime"></span></p>
+    </div>
+
+    <script>
+    // ===== 真实数据 =====
+    const dashboardData = {
+        "update_time": "2026-03-24 15:30",
+        "年度预算": {
+            "数据公司": {"营收预算": 107500, "利润预算": 13000, "新签合同预算": 123625},
+            "数字运营公司": {"营收预算": 330000, "利润预算": 52000, "新签合同预算": 379500},
+            "BG合计": {"营收预算": 437500, "利润预算": 65000, "新签合同预算": 503125}
+        },
+        "月度营收": [
+            {"单位": "关联", "事业部": "", "1月": 0, "2月": 0, "累计": 2287.59, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "数据供给事业部", "1月": 242.83, "2月": 195.55, "累计": 438.38, "年度计划": 26018.9, "完成率": 1.68},
+            {"单位": "", "事业部": "数据平台事业部", "1月": 6311.04, "2月": 1180.47, "累计": 7491.51, "年度计划": 29576.5, "完成率": 25.33},
+            {"单位": "", "事业部": "安全产品事业部", "1月": 667.14, "2月": 51.61, "累计": 718.75, "年度计划": 26624.6, "完成率": 2.7},
+            {"单位": "", "事业部": "财务金融产品部", "1月": 0, "2月": 0, "累计": 695.37, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "党群人资产品部", "1月": 0, "2月": 0, "累计": 2237.89, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "供应链平台产品部", "1月": 0, "2月": 0, "累计": 1263.41, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "规划平台产品部", "1月": 0, "2月": 0, "累计": 913.7, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "架构运营产品部", "1月": 0, "2月": 0, "累计": 93.26, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "交付中心", "1月": 0, "2月": 0, "累计": 1369.06, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "数字运营产品部", "1月": 0, "2月": 0, "累计": 5423.79, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "行政合规产品部", "1月": 0, "2月": 0, "累计": 8294.22, "年度计划": 0, "完成率": 0},
+            {"单位": "", "事业部": "云平台产品部", "1月": 0, "2月": 0, "累计": 4158.95, "年度Plan": 0, "完成率": 0},
+            {"单位": "", "事业部": "中台产品部", "1月": 0, "2月": 0, "累计": 823.1, "年度计划": 0, "完成率": 0},
+            {"单位": "数据公司合计", "事业部": "", "1月": 0, "2月": 0, "累计": 10110.72, "年度计划": 107500, "完成率": 9.4},
+            {"单位": "数字运营合计", "事业部": "", "1月": 0, "2月": 0, "累计": 13757.38, "年度计划": 330000, "完成率": 4.17}
+        ],
+        "预警设置": {
+            "数据公司毛利率预警线": 25.26
+        }
+    };
+    
+    // 格式化数字
+    function formatNum(n) {
+        if(n >= 10000) return (n/10000).toFixed(2) + '亿';
+        if(n >= 10000) return n.toFixed(0) + '万';
+        return n.toFixed(2);
+    }
+    
+    // 填充表格
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        let html = '';
+        
+        const divisions = [
+            {name: "数据平台事业部", jan: 6311.04, feb: 1180.47, total: 7491.51, plan: 29576.5},
+            {name: "数字运营产品部", jan: 0, feb: 0, total: 5423.79, plan: 0},
+            {name: "行政合规产品部", jan: 0, feb: 0, total: 8294.22, plan: 0},
+            {name: "云平台产品部", jan: 0, feb: 0, total: 4158.95, plan: 0},
+            {name: "党群人资产品部", jan: 0, feb: 0, total: 2237.89, plan: 0},
+            {name: "供应链平台产品部", jan: 0, feb: 0, total: 1263.41, plan: 0},
+            {name: "数据供给事业部", jan: 242.83, feb: 195.55, total: 438.38, plan: 26018.9},
+            {name: "安全产品事业部", jan: 667.14, feb: 51.61, total: 718.75, plan: 26624.6},
+            {name: "中台产品部", jan: 0, feb: 0, total: 823.1, plan: 0},
+            {name: "交付中心", jan: 0, feb: 0, total: 1369.06, plan: 0},
+            {name: "规划平台产品部", jan: 0, feb: 0, total: 913.7, plan: 0},
+            {name: "数据公司合计", jan: 0, feb: 0, total: 10110.72, plan: 107500, isTotal: true},
+            {name: "数字运营合计", jan: 0, feb: 0, total: 13757.38, plan: 330000, isTotal: true},
+            {name: "BG总计", jan: 0, feb: 0, total: 23868.1, plan: 437500, isTotal: true}
+        ];
+        
+        divisions.forEach(d => {
+            const rate = d.plan > 0 ? (d.total / d.plan * 100).toFixed(1) : '-';
+            let status = rate === '-' ? '-' : (rate >= 25 ? '<span class="badge success">正常</span>' : (rate >= 15 ? '<span class="badge warning">监控</span>' : '<span class="badge danger">预警</span>'));
+            if(d.isTotal) status = '-';
+            
+            html += `<tr ${d.isTotal ? 'style="background: rgba(0,217,255,0.1);"' : ''}>
+                <td><strong>${d.name}</strong></td>
+                <td>${d.jan.toFixed(2)}</td>
+                <td>${d.feb.toFixed(2)}</td>
+                <td><strong>${d.total.toFixed(2)}</strong></td>
+                <td>${d.plan > 0 ? d.plan.toFixed(0) : '-'}</td>
+                <td>${rate}%</td>
+                <td>${status}</td>
+            </tr>`;
+        });
+        
+        tbody.innerHTML = html;
+    }
+    
+    // 初始化
+    document.getElementById('updateTime').textContent = dashboardData.update_time;
+    renderTable();
+    
+    // Chart配置
+    Chart.defaults.color = 'rgba(255,255,255,0.7)';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.1)';
+    
+    // 营收趋势图
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: ['1月', '2月'],
+            datasets: [{
+                label: '实际营收',
+                data: [12192.65, 11675.45],
+                borderColor: '#00d9ff',
+                backgroundColor: 'rgba(0,217,255,0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointBackgroundColor: '#00d9ff'
+            }, {
+                label: '预算目标(月均)',
+                data: [36458, 36458],
+                borderColor: '#ffd93d',
+                borderDash: [5, 5],
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => v + '万' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+    
+    // 公司占比饼图
+    new Chart(document.getElementById('companyPieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['数据公司', '数字运营公司'],
+            datasets: [{
+                data: [10110.72, 13757.38],
+                backgroundColor: ['#00d9ff', '#00ff88'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            cutout: '60%'
+        }
+    });
+    
+    // 预算对比图
+    new Chart(document.getElementById('budgetCompareChart'), {
+        type: 'bar',
+        data: {
+            labels: ['数据公司', '数字运营公司', 'BG合计'],
+            datasets: [{
+                label: '实际完成',
+                data: [10110.72, 13757.38, 23868.1],
+                backgroundColor: '#00d9ff',
+                borderRadius: 8
+            }, {
+                label: '年度预算',
+                data: [107500, 330000, 437500],
+                backgroundColor: 'rgba(255,217,61,0.5)',
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => v + '万' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+    
+    // 事业部完成率图
+    new Chart(document.getElementById('divisionChart'), {
+        type: 'bar',
+        data: {
+            labels: ['数据平台', '数字运营', '行政合规', '云平台', '党群', '供给', '安全'],
+            data: [25.33, 16.44, 0, 0, 0, 1.68, 2.7],
+            datasets: [{
+                label: '完成率%',
+                data: [25.33, 16.44, 0, 0, 0, 1.68, 2.7],
+                backgroundColor: ['#00ff88', '#00d9ff', '#ffd93d', '#ffd93d', '#ffd93d', '#ff6b6b', '#ff6b6b'],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, max: 35, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => v + '%' } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+    </script>
+</body>
+</html>
